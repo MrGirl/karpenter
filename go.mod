@@ -84,7 +84,6 @@ require (
 require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 )
@@ -95,3 +94,5 @@ retract (
 	v0.34.4 // accidentally published incomplete patch release
 	v0.27.7 // accidentally published incomplete patch release
 )
+
+replace sigs.k8s.io/karpenter => .

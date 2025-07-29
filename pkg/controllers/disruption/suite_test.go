@@ -19,6 +19,8 @@ package disruption_test
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/karpenter/pkg/metrics"
+	disruptionutils "sigs.k8s.io/karpenter/pkg/utils/disruption"
 	"sort"
 	"sync"
 	"testing"
@@ -28,8 +30,6 @@ import (
 	clockiface "k8s.io/utils/clock"
 
 	"sigs.k8s.io/karpenter/pkg/events"
-	"sigs.k8s.io/karpenter/pkg/metrics"
-
 	"sigs.k8s.io/karpenter/pkg/test/v1alpha1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -56,7 +56,6 @@ import (
 	"sigs.k8s.io/karpenter/pkg/scheduling"
 	"sigs.k8s.io/karpenter/pkg/test"
 	. "sigs.k8s.io/karpenter/pkg/test/expectations"
-	disruptionutils "sigs.k8s.io/karpenter/pkg/utils/disruption"
 	"sigs.k8s.io/karpenter/pkg/utils/pdb"
 	. "sigs.k8s.io/karpenter/pkg/utils/testing"
 )
@@ -242,6 +241,7 @@ var _ = Describe("Simulate Scheduling", func() {
 		Expect(err).To(Succeed())
 		Expect(results.PodErrors[pod]).To(BeNil())
 	})
+
 	It("should allow multiple replace operations to happen successively", func() {
 		numNodes := 10
 		nodeClaims, nodes := test.NodeClaimsAndNodes(numNodes, v1.NodeClaim{
@@ -853,22 +853,23 @@ var _ = Describe("Pod Eviction Cost", func() {
 var _ = Describe("Candidate Filtering", func() {
 	var nodePool *v1.NodePool
 	var nodePoolMap map[string]*v1.NodePool
-	var nodePoolInstanceTypeMap map[string]map[string]*cloudprovider.InstanceType
+	var nodePoolInstanceTypeMap map[string]map[string][]*cloudprovider.InstanceType
 	var pdbLimits pdb.Limits
 	BeforeEach(func() {
 		nodePool = test.NodePool()
 		nodePoolMap = map[string]*v1.NodePool{
 			nodePool.Name: nodePool,
 		}
-		nodePoolInstanceTypeMap = map[string]map[string]*cloudprovider.InstanceType{
-			nodePool.Name: lo.SliceToMap(cloudProvider.InstanceTypes, func(i *cloudprovider.InstanceType) (string, *cloudprovider.InstanceType) {
-				return i.Name, i
+		nodePoolInstanceTypeMap = map[string]map[string][]*cloudprovider.InstanceType{
+			nodePool.Name: lo.GroupBy(cloudProvider.InstanceTypes, func(i *cloudprovider.InstanceType) string {
+				return i.Name
 			}),
 		}
 		var err error
 		pdbLimits, err = pdb.NewLimits(ctx, env.Client)
 		Expect(err).ToNot(HaveOccurred())
 	})
+
 	It("should not consider candidates that have do-not-disrupt pods scheduled and no terminationGracePeriod", func() {
 		nodeClaim, node := test.NodeClaimAndNode(v1.NodeClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1747,6 +1748,7 @@ var _ = Describe("Candidate Filtering", func() {
 		_, err := disruption.NewCandidate(ctx, env.Client, recorder, fakeClock, cluster.Nodes()[0], pdbLimits, nodePoolMap, nodePoolInstanceTypeMap, queue, disruption.GracefulDisruptionClass)
 		Expect(err).ToNot((HaveOccurred()))
 	})
+
 	It("should consider candidates that have an instance type that cannot be resolved", func() {
 		nodeClaim, node := test.NodeClaimAndNode(v1.NodeClaim{
 			ObjectMeta: metav1.ObjectMeta{
