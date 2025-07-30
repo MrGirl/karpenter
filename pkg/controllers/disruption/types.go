@@ -111,8 +111,18 @@ func NewCandidate(ctx context.Context, kubeClient client.Client, recorder events
 		if len(instanceTypes) == 1 {
 			instanceType = instanceTypes[0]
 		} else {
+			reqs := requirements.NewLabelRequirements(node.Labels())
+
+			for i, t := range instanceTypes {
+				fmt.Println(i)
+				if t.Offerings.HasCompatible(reqs) {
+
+					fmt.Printf("i: %d, +%v", i, t)
+				}
+			}
+
 			it, ok := lo.Find(instanceTypes, func(item *cloudprovider.InstanceType) bool {
-				return item.Offerings.HasCompatible(requirements.NewLabelRequirements(node.Labels()))
+				return item.Offerings.HasCompatible(reqs)
 			})
 
 			if !ok {
